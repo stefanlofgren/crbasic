@@ -1,0 +1,66 @@
+' Program written by Carl Stefan Lofgren 12/2022
+' CR-6
+'   * Enables direct LCD readout of selected data in 20 x 4 LCD screen
+
+
+' https://www.rapidtables.com/convert/number/ascii-hex-bin-dec-converter.html
+' https://learn.sparkfun.com/tutorials/avr-based-serial-enabled-lcds-hookup-guide/serial-uart-example-code---backlight-control
+' https://learn.sparkfun.com/tutorials/avr-based-serial-enabled-lcds-hookup-guide/firmware-overview
+
+' --------------------------------------------- '
+' ---------- DECLARE THE VARIABLES ------------ '
+' --------------------------------------------- '
+
+Public pTemp, Batt_volt, pTempC, pTempF
+
+' --------------------------------------------- '
+' ----------  DEFINE DATA TABLES -------------- '
+' --------------------------------------------- '
+
+DataTable (Test,1,-1) 'Set table size to # of records, or -1 to autoallocate.
+	DataInterval (0,15,Sec,10)
+	Minimum (1,Batt_volt,FP2,False,False)
+	Sample (1,pTemp,FP2)
+EndTable
+
+' --------------------------------------------- '
+' ------------- RUN THE PROGRAM --------------- '
+' --------------------------------------------- '
+
+BeginProg
+
+	'Configure Serial LCD Display
+	PortSet (U3,1)
+	SerialOpen (ComU1,9600,16,0,80) 
+	SerialOut (ComU1,CHR(124)+CHR(135),10,0,0)
+	SerialOut (ComU1,CHR(124)+CHR(165),10,0,0)
+	SerialOut (ComU1,CHR(124)+CHR(195),10,0,0)
+
+	Scan (5,Sec,0,0)
+	  
+	' --------------------------------------------- '
+	' ------- GATHER DATA FROM SENSORS ------------ '
+	' --------------------------------------------- '
+
+	PanelTemp (pTemp,15000)
+	Battery (Batt_volt)	  
+	pTempF=(pTemp * 9/5) + 32
+	pTempF=Round(pTempF,1)
+
+	  
+	' --------------------------------------------- '
+	' ---------- DISPLAY DATA ON LCD -------------- '
+	' --------------------------------------------- '
+
+	SerialOut (ComU1,CHR(124)+CHR(45),10,0,0)
+	SerialOut (ComU1,"T: "+pTempF,10,0,0)
+	SerialOut (ComU1,CHR(254)+CHR(128+64+0),10,0,0)
+	SerialOut (ComU1,"Rh: 49%",10,0,0)
+	SerialOut (ComU1,CHR(254)+CHR(128+20+0),10,0,0)
+	SerialOut (ComU1,"SW @32 7-50",10,0,0)
+	SerialOut (ComU1,CHR(254)+CHR(128+84+0),10,0,0)
+	SerialOut (ComU1,"CO 62ppm",10,0,0) 
+			
+	NextScan
+EndProg
+
