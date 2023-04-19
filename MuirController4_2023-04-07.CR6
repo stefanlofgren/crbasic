@@ -1,0 +1,107 @@
+' Program written by Carl Stefan Lofgren 12/2022
+' CR-6
+'   * Enables direct LCD readout of selected data in 20 x 4 LCD screen
+'   * Enables winter webcam image delivery to Longmire
+'   * Enables CO (Carbon Monoxide) measurement and alert
+
+' https://www.rapidtables.com/convert/number/ascii-hex-bin-dec-converter.html
+' https://learn.sparkfun.com/tutorials/avr-based-serial-enabled-lcds-hookup-guide/serial-uart-example-code---backlight-control
+' https://learn.sparkfun.com/tutorials/avr-based-serial-enabled-lcds-hookup-guide/firmware-overview
+
+' --------------------------------------------- '
+' ---------- DECLARE THE VARIABLES ------------ '
+' --------------------------------------------- '
+
+Public pTemp, Batt_volt, pTempC, pTempF
+Public RawString As String * 30, SplitStrings(3) As String * 16
+Public FloatValue
+Public IntegerValue As Long
+Public NBytesReturned
+Public NBytes
+
+' --------------------------------------------- '
+' ----------  DEFINE DATA TABLES -------------- '
+' --------------------------------------------- '
+
+DataTable (Test,1,-1) 'Set table size to # of records, or -1 to autoallocate.
+	DataInterval (0,15,Sec,10)
+	Minimum (1,Batt_volt,FP2,False,False)
+	Sample (1,pTemp,FP2)
+EndTable
+
+' --------------------------------------------- '
+' ------------- RUN THE PROGRAM --------------- '
+' --------------------------------------------- '
+
+BeginProg
+
+  'Configure Serial LCD Display
+  PortSet (U3,1)
+  SerialOpen (ComU1,9600,16,0,80) 
+  SerialOut (ComU1,CHR(124)+CHR(135),10,0,0)
+  SerialOut (ComU1,CHR(124)+CHR(165),10,0,0)
+  SerialOut (ComU1,CHR(124)+CHR(195),10,0,0)
+  'Configure CO Sensor 
+  
+  PortSet (C3,1) 'Use C3 as power supply for device 3.3vdc
+  PortPairConfig (C1,2,0)
+  PortPairConfig (C3,2,0)  
+  SerialOpen (ComC1,9600,16,0,50)
+
+	Scan (5,Sec,0,0)
+	  
+    ' --------------------------------------------- '
+    ' ------- GATHER DATA FROM SENSORS ------------ '
+    ' --------------------------------------------- '
+
+    PanelTemp (pTemp,15000)
+		Battery (Batt_volt)	  
+	  pTempF=(pTemp * 9/5) + 32
+	  pTempF=Round(pTempF,1)
+	  
+    ' --------------------------------------------- '
+    ' ---------- READ CO Level -------------------- '
+    ' --------------------------------------------- '
+    
+    SerialOut (ComC1,&HFF+&H01+&H86+&H00+&H00+&H00+&H00+&H79,10,0,0)
+    SerialInRecord (ComC1,RawString,&HFF,8,0,NBytesReturned,01)
+    
+	  
+    ' --------------------------------------------- '
+    ' ---------- DISPLAY DATA ON LCD -------------- '
+    ' --------------------------------------------- '
+
+    SerialOut (ComU1,CHR(124)+CHR(45),10,0,0)
+    SerialOut (ComU1,"T: "+pTempF,10,0,0)
+    SerialOut (ComU1,CHR(254)+CHR(128+64+0),10,0,0)
+    SerialOut (ComU1,"Rh: 49%",10,0,0)
+    SerialOut (ComU1,CHR(254)+CHR(128+20+0),10,0,0)
+    SerialOut (ComU1,"SW @32 7-50",10,0,0)
+    SerialOut (ComU1,CHR(254)+CHR(128+84+0),10,0,0)
+    SerialOut (ComU1,"CO 62ppm",10,0,0)
+
+    ' --------------------------------------------- '
+    ' -------- TURN ON WEBCAM VIA SW12 ------------ '
+    ' --------------------------------------------- '
+    
+		If (IfTime (0,60,min)) Then
+			If (Batt_volt > 11.9) Then
+				SW12(SW12_1,1 )
+			EndIf
+		EndIf
+
+		If (IfTime (8,60,min)) Then
+		  SW12(SW12_1,0)
+		EndIf
+		
+		If (IfTime (58,60,min)) Then
+			FileManage ("USR:*.*",16)
+		EndIf 
+			
+    ' ---------------------------------------------- '  
+		
+		CallTable Test
+			
+	NextScan
+EndProg
+
